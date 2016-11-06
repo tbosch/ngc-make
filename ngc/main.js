@@ -7,6 +7,7 @@ var tsc_1 = require('@angular/tsc-wrapped/src/tsc');
 var compiler_host_1 = require('@angular/tsc-wrapped/src/compiler_host');
 var cli_options_1 = require('@angular/tsc-wrapped/src/cli_options');
 var codegen_1 = require('@angular/compiler-cli/src/codegen');
+var path_mapped_reflector_host_1 = require('@angular/compiler-cli/src/path_mapped_reflector_host');
 
 function main(project, cliOptions, codegen) {
     try {
@@ -64,13 +65,6 @@ function main(project, cliOptions, codegen) {
         }
         return codegen(ngOptions_1, cliOptions, program_1, host_1).then(function () {
             // Create a new program since codegen files were created after making the old program
-			// PATCH(tbosch): start
-			// need to re read the configuration to get the updated file names
-			// that also include the ngfactory files!
-	        var _a = tsc_1.tsc.readConfiguration(project, basePath), parsed_1 = _a.parsed, ngOptions_1 = _a.ngOptions;
-			parsed_1.fileNames = parsed_1.fileNames.filter( (fileName) => host_1.fileExists(fileName));
-			// PATCH(tbosch): end
-
             var newProgram = ts.createProgram(parsed_1.fileNames, parsed_1.options, host_1, program_1);
             tsc_1.tsc.typeCheck(host_1, newProgram);
             // Emit *.js with Decorators lowered to Annotations, and also *.js.map
@@ -111,6 +105,56 @@ compiler_host_1.MetadataWriterHost.prototype.writeFile = function(fileName, data
 		throw new Error('Bundled emit with --out is not supported');
 	}
 	this.writeMetadata(fileName, sourceFiles[0]);
+};
+// PATCH(tbosch): end
+
+// PATCH(tbosch): start
+var EXT = /(\.ts|\.d\.ts|\.js|\.jsx|\.tsx)$/;
+path_mapped_reflector_host_1.PathMappedReflectorHost.prototype.getImportPath = function (containingFile, importedFile) {
+	var _this = this;
+	importedFile = this.resolveAssetUrl(importedFile, containingFile);
+	containingFile = this.resolveAssetUrl(containingFile, '');
+	if (this.options.traceResolution) {
+		console.log('getImportPath from containingFile', containingFile, 'to importedFile', importedFile);
+	}
+	// If a file does not yet exist (because we compile it later), we still need to
+	// assume it exists so that the `resolve` method works!
+	if (!this.context.fileExists(importedFile)) {
+		if (this.options.rootDirs && this.options.rootDirs.length > 0) {
+			this.context.assumeFileExists(path.join(this.options.rootDirs[0], importedFile));
+		}
+		else {
+			this.context.assumeFileExists(importedFile);
+		}
+	}
+	var resolvable = function (candidate) {
+		// PATCH(tbosch): resolve candidate against containingFile, not the importedFile!
+		var resolved = _this.getCanonicalFileName(_this.resolve(candidate, containingFile));
+		return resolved && resolved.replace(EXT, '') === importedFile.replace(EXT, '');
+	};
+	var importModuleName = importedFile.replace(EXT, '');
+	var parts = importModuleName.split(path.sep).filter(function (p) { return !!p; });
+	var foundRelativeImport;
+	for (var index = parts.length - 1; index >= 0; index--) {
+		var candidate_1 = parts.slice(index, parts.length).join(path.sep);
+		// PATCH(tbosch): prefer relative imports over absolute imports
+		if (!foundRelativeImport && resolvable(candidate_1)) {
+			return candidate_1;
+		}
+		candidate_1 = '.' + path.sep + candidate_1;
+		if (resolvable(candidate_1)) {
+			foundRelativeImport = candidate_1;
+		}
+	}
+	if (foundRelativeImport) {
+		return foundRelativeImport;
+	}
+	// Try a relative import
+	var candidate = path.relative(path.dirname(containingFile), importModuleName);
+	if (resolvable(candidate)) {
+		return candidate;
+	}
+	throw new Error("Unable to find any resolvable import for " + importedFile + " relative to " + containingFile);
 };
 // PATCH(tbosch): end
 
