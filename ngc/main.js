@@ -38,6 +38,9 @@ function main(project, cliOptions, codegen) {
 			var result = inputDirs.some(function(inputDir) {
 				return path.startsWith(inputDir);
 			});
+			// if (!result) {
+			// 	console.log('>> prevented file', path);
+			// }
 			return result;
 		};
 
@@ -61,6 +64,13 @@ function main(project, cliOptions, codegen) {
         }
         return codegen(ngOptions_1, cliOptions, program_1, host_1).then(function () {
             // Create a new program since codegen files were created after making the old program
+			// PATCH(tbosch): start
+			// need to re read the configuration to get the updated file names
+			// that also include the ngfactory files!
+	        var _a = tsc_1.tsc.readConfiguration(project, basePath), parsed_1 = _a.parsed, ngOptions_1 = _a.ngOptions;
+			parsed_1.fileNames = parsed_1.fileNames.filter( (fileName) => host_1.fileExists(fileName));
+			// PATCH(tbosch): end
+
             var newProgram = ts.createProgram(parsed_1.fileNames, parsed_1.options, host_1, program_1);
             tsc_1.tsc.typeCheck(host_1, newProgram);
             // Emit *.js with Decorators lowered to Annotations, and also *.js.map
