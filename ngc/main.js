@@ -9,6 +9,51 @@ var cli_options_1 = require('@angular/tsc-wrapped/src/cli_options');
 var codegen_1 = require('@angular/compiler-cli/src/codegen');
 var path_mapped_reflector_host_1 = require('@angular/compiler-cli/src/path_mapped_reflector_host');
 var multimatch = require('multimatch');
+var http = require('http');
+
+// TODO: this needs to be invalidated!
+var fileCache = {};
+const PORT=8080;
+
+exports.startServer = function startServer() {
+	function handleRequest(request, response){
+		var body = [];
+		request.on('data', function(chunk) {
+			body.push(chunk);
+		}).on('end', function() {
+			body = Buffer.concat(body).toString();
+			if (!body) {
+				response.statusCode = 500;
+				response.end('No body');
+				return;
+			}
+			var options = JSON.parse(body);
+			console.log('Compilation started', JSON.stringify(options));
+			var project = options.p || options.project || '.';
+			var cliOptions = new cli_options_1.NgcCliOptions(options);
+			cliOptions.strictInputs = options.strictInputs;
+			main(project, cliOptions, codegen).then(function (exitCode) {
+				console.log('Compilation done', exitCode || 0);
+				if (exitCode) {
+					response.statusCode = 500;
+					response.end('Error');
+				} else {
+					response.statusCode = 200;
+					response.end('Done');
+				}
+			}).catch(function (e) {
+				console.error(e.stack);
+				response.statusCode = 500;
+				response.end('Error');
+			});
+		});
+	}
+
+	var server = http.createServer(handleRequest);
+	server.listen(PORT, function(){
+		console.log("Server listening on: http://localhost:%s", PORT);
+	});
+}
 
 function main(project, cliOptions, codegen) {
     try {
@@ -27,13 +72,28 @@ function main(project, cliOptions, codegen) {
         // todo(misko): remove once facade symlinks are removed
         host_1.realpath = function (path) { return path; };
 
-		// PATCH(tbosch): start, add strictInputs option
+		// PATCH(tbosch): start, add strictInputs option and file caching
+		var origGetSourceFile = host_1.getSourceFile;
+		host_1.getSourceFile = function (fileName, languageVersion) {
+			var result = fileCache[fileName];
+			if (!result) {
+				var srcFile = origGetSourceFile.apply(this, arguments);
+				if (srcFile) {
+					result = srcFile.text;
+				}
+				fileCache[fileName] = result;
+			}
+			return result ? ts.createSourceFile(fileName, result, languageVersion, true) : null;
+		};
 		var origFileExists = host_1.fileExists;
-		host_1.fileExists = function(fileName) {
+  		host_1.fileExists = function(fileName) {
 			if (cliOptions.strictInputs) {
 				if (multimatch(fileName, cliOptions.strictInputs).length === 0) {
 					return false;
 				}
+			}
+			if (fileCache[fileName]) {
+				return true;
 			}
 			return origFileExists.apply(this, arguments);
 		};

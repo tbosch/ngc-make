@@ -15,8 +15,6 @@ Try to add a single rule to compile the node_modules deps
   * e.g. use material
   * need to turn off generateCodeForLibraries in tsconfig for this...
 
-Try to get a tsserver running while calling tsc during make multiple times...
-
 ------
 Debate on Monday the usage of make!
 

@@ -24,9 +24,9 @@ clean:
 	rm -fr srcgen/*/*
 
 dist/mod1/%.metadata.json dist/mod1/%.d.ts dist/mod1/%.js: $(MOD1_SRC) $(MOD1_DEPS)
-	node ./ngc/main.js -p src/tsconfig.json --strictInputs $(call sortedfolders,$?)
-	node ./ngc/main.js -p srcgen/tsconfig.json --strictInputs $(call ngfactoryinputs,$(call sortedfolders,$?))
+	node ./ngc/client.js -p src/tsconfig.json --strictInputs $(call sortedfolders,$?)
+	node ./ngc/client.js -p srcgen/tsconfig.json --strictInputs $(call ngfactoryinputs,$(call sortedfolders,$?))
 
 dist/mod2/%.metadata.json dist/mod2/%.d.ts dist/mod2/%.js: $(MOD2_SRC) $(MOD2_DEPS)
-	node ./ngc/main.js -p src/tsconfig.json --strictInputs $(call sortedfolders,$?)
-	node ./ngc/main.js -p srcgen/tsconfig.json --strictInputs $(call ngfactoryinputs,$(call sortedfolders,$?))
+	node ./ngc/client.js -p src/tsconfig.json --strictInputs $(call sortedfolders,$?)
+	node ./ngc/client.js -p srcgen/tsconfig.json --strictInputs $(call ngfactoryinputs,$(call sortedfolders,$?))
