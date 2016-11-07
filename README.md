@@ -1,13 +1,4 @@
 TODO:
-- state:
-  * everything works fine for generating .d.ts , .metadata.json and .js files
-  * only the ngc compiler makes trouble (see below)
-
-!! fix current error when an NgModule depends on another NgModule !!
-  * Error at /Users/tbosch/projects/make-test/src/mod2/mod.ngfactory.ts:9:26: Cannot find module 'mod1/mod'.
-  * the import is wrong: this should be `../mod1/mod`!
-    - check the bug from Jeremy that also complains about wrong import paths...
-
 !! Transitive deps with make !!
 - user has to define all of them as direct deps. Is there another way?
 - we can help this with the summaries!

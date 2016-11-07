@@ -1,6 +1,20 @@
-# TODO: How to simplify these rules??
+# Restriction: all input dirs are non recursive!!
+# Restriction: filter lists by starting path!!
 
-COMMON_INPUT_DIRS=../node_modules/@angular/core,../node_modules/rxjs
+COMMON_INPUT_DIRS=./node_modules/@angular/core/* ./node_modules/rxjs/*
+
+# Note: need to escape the * so that bash does not expand it
+sortedfolders = $(addsuffix /\*\*,$(abspath $(sort $(dir $(1)))))
+
+# TODO: exclude .ngfactory.d.ts files from dist folder that corresponds to
+# the src folder.
+ngfactoryinputs = $(sort $(subst src/,srcgen/,$(1)) $(subst src/,dist/,$(1)))
+
+MOD1_SRC=src/mod1/*.ts
+MOD1_DEPS=$(COMMON_INPUT_DIRS)
+
+MOD2_SRC=src/mod2/*.ts
+MOD2_DEPS=dist/mod1/*.d.ts $(COMMON_INPUT_DIRS)
 
 all: dist/mod1/*.d.ts dist/mod2/*.d.ts
 
@@ -9,15 +23,10 @@ clean:
 	rm -fr srcgen/*.ts
 	rm -fr srcgen/*/*
 
-dist/mod1/%.metadata.json dist/mod1/%.d.ts dist/mod1/%.js: src/mod1/*.ts
-	node ./ngc/main.js -p src/tsconfig.json --inputDirs mod1,$(COMMON_INPUT_DIRS)
-	# TODO: only allow the .d.ts files produced from src/mod1/*.ts, but not from ngfactory files,
-	# otherwise we get a cycle!
-	# -> need to pass `--inputFiles` instead of `--inputDirs` and set it to the
-	#    make file prerequisites (via a variable!)
-	node ./ngc/main.js -p srcgen/tsconfig.json --inputDirs mod1,../dist/mod1,$(COMMON_INPUT_DIRS)
+dist/mod1/%.metadata.json dist/mod1/%.d.ts dist/mod1/%.js: $(MOD1_SRC) $(MOD1_DEPS)
+	node ./ngc/main.js -p src/tsconfig.json --strictInputs $(call sortedfolders,$?)
+	node ./ngc/main.js -p srcgen/tsconfig.json --strictInputs $(call ngfactoryinputs,$(call sortedfolders,$?))
 
-dist/mod2/%.metadata.json dist/mod2/%.d.ts dist/mod2/%.js: src/mod2/*.ts dist/mod1/*.d.ts
-	node ./ngc/main.js -p src/tsconfig.json --inputDirs mod2,../dist/mod1,$(COMMON_INPUT_DIRS)
-	# TODO: only allow the .d.ts files produced from src/mod2/*.ts, but not from ngfactory files (see above)
-	node ./ngc/main.js -p srcgen/tsconfig.json --inputDirs mod2,../dist/mod1,../dist/mod2,$(COMMON_INPUT_DIRS)
+dist/mod2/%.metadata.json dist/mod2/%.d.ts dist/mod2/%.js: $(MOD2_SRC) $(MOD2_DEPS)
+	node ./ngc/main.js -p src/tsconfig.json --strictInputs $(call sortedfolders,$?)
+	node ./ngc/main.js -p srcgen/tsconfig.json --strictInputs $(call ngfactoryinputs,$(call sortedfolders,$?))

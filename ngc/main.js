@@ -8,6 +8,7 @@ var compiler_host_1 = require('@angular/tsc-wrapped/src/compiler_host');
 var cli_options_1 = require('@angular/tsc-wrapped/src/cli_options');
 var codegen_1 = require('@angular/compiler-cli/src/codegen');
 var path_mapped_reflector_host_1 = require('@angular/compiler-cli/src/path_mapped_reflector_host');
+var multimatch = require('multimatch');
 
 function main(project, cliOptions, codegen) {
     try {
@@ -26,33 +27,15 @@ function main(project, cliOptions, codegen) {
         // todo(misko): remove once facade symlinks are removed
         host_1.realpath = function (path) { return path; };
 
-		// PATCH(tbosch): start
-		var inputDirs;
-		if (cliOptions.inputDirs) {
-			inputDirs = {};
-			inputDirs = cliOptions.inputDirs.map(function(dir) {
-				return path.resolve(basePath, dir);
-			});
-		}
-
-		var checkInputPath = function(path) {
-			var result = inputDirs.some(function(inputDir) {
-				return path.startsWith(inputDir);
-			});
-			// if (!result) {
-			// 	console.log('>> prevented file', path);
-			// }
-			return result;
-		};
-
+		// PATCH(tbosch): start, add strictInputs option
 		var origFileExists = host_1.fileExists;
 		host_1.fileExists = function(fileName) {
-			var dirPath = path.dirname(fileName);
-			var result = origFileExists.apply(this, arguments);
-			if (inputDirs) {
-				result = result && checkInputPath(dirPath);
+			if (cliOptions.strictInputs) {
+				if (multimatch(fileName, cliOptions.strictInputs).length === 0) {
+					return false;
+				}
 			}
-			return result;
+			return origFileExists.apply(this, arguments);
 		};
 		parsed_1.fileNames = parsed_1.fileNames.filter( (fileName) => host_1.fileExists(fileName));
 		// PATCH(tbosch): end
@@ -170,10 +153,9 @@ exports.main = main;
 if (require.main === module) {
     var args_1 = require('minimist')(process.argv.slice(2));
     var project = args_1.p || args_1.project || '.';
-	// PATCH(tbosch): Added inputDirs
-	var inputDirs = args_1.inputDirs ? args_1.inputDirs.split(',') : null;
     var cliOptions = new cli_options_1.NgcCliOptions(args_1);
-	cliOptions.inputDirs = inputDirs;
+	// PATCH(tbosch): Added strictInputs
+	cliOptions.strictInputs = args_1.strictInputs ? [args_1.strictInputs].concat(args_1._) : null;
     // PATCH(tbosch): Added codegen
 	// main(project, cliOptions, codegen).then(function (exitCode) { return process.exit(exitCode); }).catch(function (e) {
 	main(project, cliOptions, codegen).then(function (exitCode) { return process.exit(exitCode); }).catch(function (e) {
